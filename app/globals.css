@@ -1,26 +1,154 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  
+  /* MAS Custom Colors */
+  --color-mas-white: #FFFFFF;
+  --color-mas-cream: #FDF8F3;
+  --color-mas-gold-light: #F4D03F;
+  --color-mas-gold: #D4AF37;
+  --color-mas-gold-dark: #B8860B;
+  --color-mas-blue-light: #5DADE2;
+  --color-mas-blue: #1E5AA8;
+  --color-mas-blue-dark: #154785;
+  --color-mas-blue-navy: #0F2C59;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root {
+  --radius: 0.625rem;
+  --background: #FDF8F3;
+  --foreground: #0F2C59;
+  --card: #FFFFFF;
+  --card-foreground: #0F2C59;
+  --popover: #FFFFFF;
+  --popover-foreground: #0F2C59;
+  --primary: #1E5AA8;
+  --primary-foreground: #FFFFFF;
+  --secondary: #FDF8F3;
+  --secondary-foreground: #0F2C59;
+  --muted: #FDF8F3;
+  --muted-foreground: #6B7280;
+  --accent: #D4AF37;
+  --accent-foreground: #0F2C59;
+  --destructive: #EF4444;
+  --border: #E5E7EB;
+  --input: #E5E7EB;
+  --ring: #1E5AA8;
+  --chart-1: #1E5AA8;
+  --chart-2: #D4AF37;
+  --chart-3: #5DADE2;
+  --chart-4: #F4D03F;
+  --chart-5: #B8860B;
+  --sidebar: #FFFFFF;
+  --sidebar-foreground: #0F2C59;
+  --sidebar-primary: #1E5AA8;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #FDF8F3;
+  --sidebar-accent-foreground: #0F2C59;
+  --sidebar-border: #E5E7EB;
+  --sidebar-ring: #1E5AA8;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #FDF8F3;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D4AF37;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #B8860B;
+}
+
+/* Animation for check-in success */
+@keyframes check-in-success {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-check-in {
+  animation: check-in-success 0.3s ease-out;
+}
+
+/* Offline indicator pulse */
+@keyframes offline-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-offline {
+  animation: offline-pulse 2s ease-in-out infinite;
 }
