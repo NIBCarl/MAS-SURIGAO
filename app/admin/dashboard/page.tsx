@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -181,9 +182,18 @@ export default function AdminDashboardPage() {
     <div className="max-w-7xl mx-auto px-4 pb-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-[#0F2C59]">Admin Dashboard</h1>
-          <p className="text-[#0F2C59]/60">Overview of MAS-AMICUS attendance</p>
+        <div className="flex items-center gap-4">
+          <Image
+            src="/mas-logo.jpg"
+            alt="MAS-AMICUS Logo"
+            width={60}
+            height={60}
+            className="rounded-lg"
+          />
+          <div>
+            <h1 className="text-2xl font-bold text-[#0F2C59]">Admin Dashboard</h1>
+            <p className="text-[#0F2C59]/60">Overview of MAS-AMICUS attendance</p>
+          </div>
         </div>
         <Button
           onClick={exportToCSV}

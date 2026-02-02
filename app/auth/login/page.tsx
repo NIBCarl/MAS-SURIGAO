@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import Image from 'next/image';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -31,8 +32,15 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-[#FDF8F3] p-4">
       <Card className="w-full max-w-md border-[#D4AF37]/20">
         <CardHeader className="text-center space-y-2">
-          <div className="mx-auto w-16 h-16 rounded-full bg-[#1E5AA8] flex items-center justify-center mb-4">
-            <span className="text-2xl font-bold text-white">MAS</span>
+          <div className="mx-auto mb-4">
+            <Image
+              src="/mas-logo.jpg"
+              alt="MAS-AMICUS Surigao Chapter Logo"
+              width={120}
+              height={120}
+              className="mx-auto"
+              priority
+            />
           </div>
           <CardTitle className="text-2xl text-[#0F2C59]">
             MAS-AMICUS

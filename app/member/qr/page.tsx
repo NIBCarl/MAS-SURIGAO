@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { QRCodeSVG } from 'qrcode.react';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -92,8 +93,14 @@ export default function MemberQRPage() {
     <div className="max-w-md mx-auto px-4 pb-8">
       {/* Header */}
       <div className="text-center mb-6">
-        <div className="w-12 h-12 rounded-full bg-[#1E5AA8] flex items-center justify-center mx-auto mb-3">
-          <User className="w-6 h-6 text-white" />
+        <div className="mx-auto mb-3">
+          <Image
+            src="/mas-logo.jpg"
+            alt="MAS-AMICUS Logo"
+            width={80}
+            height={80}
+            className="mx-auto rounded-full"
+          />
         </div>
         <h1 className="text-xl font-bold text-[#0F2C59]">{user?.full_name}</h1>
         <Badge variant="outline" className={`mt-2 ${getStatusColor(user?.status)}`}>
@@ -122,7 +129,7 @@ export default function MemberQRPage() {
               </div>
             )}
           </div>
-          
+
           <div className="flex gap-3">
             <Button
               onClick={downloadQR}
@@ -222,8 +229,8 @@ export default function MemberQRPage() {
 
       {/* View Full Stats Link */}
       <div className="mt-4 text-center">
-        <Link 
-          href="/member/stats" 
+        <Link
+          href="/member/stats"
           className="text-[#1E5AA8] hover:text-[#154785] text-sm underline"
         >
           View Full Statistics →

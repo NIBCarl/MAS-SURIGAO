@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import Image from 'next/image';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -343,45 +344,54 @@ export default function SecretaryCheckInPage() {
       {/* Header with Live Counter */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-2xl font-bold text-[#0F2C59]">Check-In Hub</h1>
-            {/* Event Selector Dropdown */}
-            {allEvents.length > 0 ? (
-              <Select
-                value={selectedEventId || ''}
-                onValueChange={(value) => {
-                  setSelectedEventId(value);
-                  // Find and set the selected event
-                  const selected = allEvents.find(e => e.id === value || e.localId?.toString() === value);
-                  setTodayEvent(selected || null);
-                  // Load attendance for selected event (support both server and local IDs)
-                  if (selected) {
-                    const eventId = selected.id || `local-${selected.localId}`;
-                    db.getEventAttendance(eventId, selected.localId).then(setTodayAttendance);
-                  } else {
-                    setTodayAttendance([]);
-                  }
-                }}
-              >
-                <SelectTrigger className="w-[240px] mt-1 border-[#D4AF37]/30 text-[#0F2C59]">
-                  <SelectValue placeholder="Select an event" />
-                </SelectTrigger>
-                <SelectContent>
-                  {allEvents.map((event) => (
-                    <SelectItem
-                      key={event.id || event.localId}
-                      value={event.id || event.localId?.toString() || ''}
-                    >
-                      {event.title} - {event.event_date}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <p className="text-[#0F2C59]/60">
-                No events available - Create one to start!
-              </p>
-            )}
+          <div className="flex items-center gap-3">
+            <Image
+              src="/mas-logo.jpg"
+              alt="MAS-AMICUS Logo"
+              width={50}
+              height={50}
+              className="rounded-lg"
+            />
+            <div>
+              <h1 className="text-2xl font-bold text-[#0F2C59]">Check-In Hub</h1>
+              {/* Event Selector Dropdown */}
+              {allEvents.length > 0 ? (
+                <Select
+                  value={selectedEventId || ''}
+                  onValueChange={(value) => {
+                    setSelectedEventId(value);
+                    // Find and set the selected event
+                    const selected = allEvents.find(e => e.id === value || e.localId?.toString() === value);
+                    setTodayEvent(selected || null);
+                    // Load attendance for selected event (support both server and local IDs)
+                    if (selected) {
+                      const eventId = selected.id || `local-${selected.localId}`;
+                      db.getEventAttendance(eventId, selected.localId).then(setTodayAttendance);
+                    } else {
+                      setTodayAttendance([]);
+                    }
+                  }}
+                >
+                  <SelectTrigger className="w-[240px] mt-1 border-[#D4AF37]/30 text-[#0F2C59]">
+                    <SelectValue placeholder="Select an event" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allEvents.map((event) => (
+                      <SelectItem
+                        key={event.id || event.localId}
+                        value={event.id || event.localId?.toString() || ''}
+                      >
+                        {event.title} - {event.event_date}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <p className="text-[#0F2C59]/60">
+                  No events available - Create one to start!
+                </p>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-4">
             <Button
@@ -442,9 +452,27 @@ export default function SecretaryCheckInPage() {
 
       {/* Check-in Result Overlay */}
       {showResult && checkInResult && (
-        <div className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${checkInResult.success ? 'bg-green-500/90' : checkInResult.alreadyCheckedIn ? 'bg-yellow-500/90' : 'bg-red-500/90'
-          }`}>
-          <div className="bg-white rounded-2xl p-8 text-center max-w-sm w-full animate-check-in">
+        <div
+          className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${checkInResult.success ? 'bg-green-500/90' : checkInResult.alreadyCheckedIn ? 'bg-yellow-500/90' : 'bg-red-500/90'
+            }`}
+          onClick={() => setShowResult(false)}
+        >
+          <div
+            className="bg-white rounded-2xl p-8 text-center max-w-sm w-full animate-check-in relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close Button */}
+            <button
+              onClick={() => setShowResult(false)}
+              className="absolute top-3 right-3 w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
+              aria-label="Close"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+
             <div className={`w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center ${checkInResult.success ? 'bg-green-100' : checkInResult.alreadyCheckedIn ? 'bg-yellow-100' : 'bg-red-100'
               }`}>
               {checkInResult.success ? (
