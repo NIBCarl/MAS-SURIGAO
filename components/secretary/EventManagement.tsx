@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -19,7 +18,7 @@ import {
     DropdownMenuTrigger,
     DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { Calendar, MoreHorizontal, Pencil, Trash2, Plus, Clock, MapPin } from 'lucide-react';
+import { Calendar, MoreHorizontal, Pencil, Trash2, Plus, Clock, MapPin, ChevronRight } from 'lucide-react';
 import { Event } from '@/types';
 import { EditEventDialog } from './EditEventDialog';
 import { CreateEventDialog } from './CreateEventDialog';
@@ -33,6 +32,20 @@ interface EventManagementProps {
     onSelectEvent?: (event: Event) => void;
 }
 
+// Enhanced color system
+const colors = {
+    darkest: '#0F2C59',
+    dark: '#1E5AA8',
+    base: '#2B6CB0',
+    light: '#4299E1',
+    lighter: '#63B3ED',
+    lightest: '#90CDF4',
+    gold: '#D4AF37',
+    success: '#10B981',
+    warning: '#F59E0B',
+    error: '#EF4444',
+};
+
 export function EventManagement({ events, onRefresh, onSelectEvent }: EventManagementProps) {
     const [showEditDialog, setShowEditDialog] = useState(false);
     const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -41,16 +54,26 @@ export function EventManagement({ events, onRefresh, onSelectEvent }: EventManag
     const [loading, setLoading] = useState(false);
 
     const getStatusBadge = (status: string) => {
-        switch (status) {
-            case 'active':
-                return <Badge className="bg-green-100 text-green-800">Active</Badge>;
-            case 'upcoming':
-                return <Badge className="bg-blue-100 text-blue-800">Upcoming</Badge>;
-            case 'closed':
-                return <Badge className="bg-gray-100 text-gray-800">Closed</Badge>;
-            default:
-                return <Badge className="bg-gray-100 text-gray-800">{status}</Badge>;
-        }
+        const styles: Record<string, { bg: string; text: string }> = {
+            active: { bg: 'rgba(16,185,129,0.15)', text: '#10B981' },
+            upcoming: { bg: 'rgba(59,130,246,0.15)', text: '#3B82F6' },
+            closed: { bg: 'rgba(107,114,128,0.15)', text: '#9CA3AF' },
+        };
+        
+        const style = styles[status] || styles.closed;
+        
+        return (
+            <Badge 
+                className="h-8 px-3 rounded-lg font-semibold border-0 capitalize"
+                style={{ 
+                    background: style.bg,
+                    color: style.text,
+                    boxShadow: `0 2px 8px ${style.bg}`
+                }}
+            >
+                {status}
+            </Badge>
+        );
     };
 
     const formatDate = (dateStr: string) => {
@@ -119,6 +142,7 @@ export function EventManagement({ events, onRefresh, onSelectEvent }: EventManag
             // Sync delete if has server ID
             if (selectedEvent.id) {
                 await db.addToSyncQueue('events', 'delete', selectedEvent);
+
                 try {
                     await supabase.from('events').delete().eq('id', selectedEvent.id);
                 } catch (err) {
@@ -170,106 +194,202 @@ export function EventManagement({ events, onRefresh, onSelectEvent }: EventManag
 
     return (
         <>
-            <Card className="border-[#D4AF37]/20">
-                <CardHeader>
-                    <div className="flex items-center justify-between">
-                        <CardTitle className="text-[#0F2C59] flex items-center gap-2">
-                            <Calendar className="w-5 h-5 text-[#D4AF37]" />
-                            Event Management
-                        </CardTitle>
+            <div 
+                className="rounded-3xl overflow-hidden"
+                style={{ 
+                    background: `linear-gradient(145deg, ${colors.dark} 0%, ${colors.darkest} 100%)`,
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.1)'
+                }}
+            >
+                {/* Header */}
+                <div className="p-6 border-b" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                            <div 
+                                className="w-12 h-12 rounded-xl flex items-center justify-center"
+                                style={{ 
+                                    background: `linear-gradient(145deg, ${colors.gold} 0%, #B8860B 100%)`,
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.2)'
+                                }}
+                            >
+                                <Calendar className="w-6 h-6 text-white" />
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-bold text-white">Event Management</h2>
+                                <p className="text-sm" style={{ color: colors.lighter }}>
+                                    {events.length} events total
+                                </p>
+                            </div>
+                        </div>
+                        
                         <Button
                             onClick={() => setShowCreateDialog(true)}
-                            className="bg-[#D4AF37] hover:bg-[#B8860B] text-white"
+                            className="h-12 px-6 rounded-xl font-semibold text-white border-0"
+                            style={{ 
+                                background: `linear-gradient(145deg, ${colors.gold} 0%, #B8860B 100%)`,
+                                boxShadow: '0 4px 12px rgba(212,175,55,0.3), inset 0 1px 0 rgba(255,255,255,0.3)'
+                            }}
                         >
-                            <Plus className="w-4 h-4 mr-2" />
+                            <Plus className="w-5 h-5 mr-2" />
                             Create Event
                         </Button>
                     </div>
-                </CardHeader>
-                <CardContent>
+                </div>
+
+                {/* Content */}
+                <div className="p-6">
                     {events.length === 0 ? (
-                        <div className="text-center py-8 text-gray-500">
-                            <Calendar className="w-12 h-12 mx-auto mb-2 text-gray-300" />
-                            No events yet. Create your first event!
+                        <div 
+                            className="text-center py-16 rounded-2xl"
+                            style={{ background: 'rgba(0,0,0,0.2)' }}
+                        >
+                            <Calendar className="w-16 h-16 mx-auto mb-4 opacity-30" style={{ color: colors.lighter }} />
+                            <p className="text-lg mb-2" style={{ color: colors.light }}>No Events Yet</p>
+                            <p className="text-sm mb-6" style={{ color: colors.lighter }}>Create your first event to get started</p>
+                            <Button
+                                onClick={() => setShowCreateDialog(true)}
+                                className="h-12 px-6 rounded-xl font-semibold text-white border-0"
+                                style={{ 
+                                    background: `linear-gradient(145deg, ${colors.light} 0%, ${colors.base} 100%)`,
+                                    boxShadow: '0 4px 12px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.2)'
+                                }}
+                            >
+                                <Plus className="w-5 h-5 mr-2" />
+                                Create First Event
+                            </Button>
                         </div>
                     ) : (
-                        <div className="rounded-md border">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Event</TableHead>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead>Time</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead className="text-right">Actions</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {events.map((event) => (
-                                        <TableRow
-                                            key={event.localId || event.id}
-                                            className="cursor-pointer hover:bg-gray-50"
-                                            onClick={() => onSelectEvent?.(event)}
+                        <div 
+                            className="rounded-2xl overflow-hidden"
+                            style={{ 
+                                boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.3)'
+                            }}
+                        >
+                            <div className="overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow 
+                                            className="border-0"
+                                            style={{ background: 'rgba(0,0,0,0.3)' }}
                                         >
-                                            <TableCell>
-                                                <div>
-                                                    <div className="font-medium text-[#0F2C59]">{event.title}</div>
-                                                    {event.location && (
-                                                        <div className="text-sm text-gray-500 flex items-center gap-1">
-                                                            <MapPin className="w-3 h-3" />
-                                                            {event.location}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>{formatDate(event.event_date)}</TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-1 text-gray-600">
-                                                    <Clock className="w-4 h-4" />
-                                                    {formatTime12Hour(event.start_time)}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>{getStatusBadge(event.status)}</TableCell>
-                                            <TableCell className="text-right">
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                                        <Button variant="ghost" size="sm">
-                                                            <MoreHorizontal className="w-4 h-4" />
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end">
-                                                        <DropdownMenuItem
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleEdit(event);
-                                                            }}
-                                                        >
-                                                            <Pencil className="w-4 h-4 mr-2" />
-                                                            Edit Event
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuSeparator />
-                                                        <DropdownMenuItem
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                setSelectedEvent(event);
-                                                                setShowDeleteDialog(true);
-                                                            }}
-                                                            className="text-red-600"
-                                                        >
-                                                            <Trash2 className="w-4 h-4 mr-2" />
-                                                            Delete Event
-                                                        </DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </TableCell>
+                                            <TableHead className="text-white/80 font-semibold uppercase tracking-wider text-xs">Event</TableHead>
+                                            <TableHead className="text-white/80 font-semibold uppercase tracking-wider text-xs">Date</TableHead>
+                                            <TableHead className="text-white/80 font-semibold uppercase tracking-wider text-xs">Time</TableHead>
+                                            <TableHead className="text-white/80 font-semibold uppercase tracking-wider text-xs">Status</TableHead>
+                                            <TableHead className="text-white/80 font-semibold uppercase tracking-wider text-xs text-right">Actions</TableHead>
                                         </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {events.map((event) => (
+                                            <TableRow
+                                                key={event.localId || event.id}
+                                                className="border-0 cursor-pointer transition-colors hover:bg-white/5 group"
+                                                style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}
+                                                onClick={() => onSelectEvent?.(event)}
+                                            >
+                                                <TableCell>
+                                                    <div className="flex items-center gap-3">
+                                                        <div 
+                                                            className="w-10 h-10 rounded-xl flex items-center justify-center"
+                                                            style={{ 
+                                                                background: `linear-gradient(145deg, ${colors.light} 0%, ${colors.base} 100%)`,
+                                                                boxShadow: '0 4px 12px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.1)'
+                                                            }}
+                                                        >
+                                                            <Calendar className="w-5 h-5 text-white" />
+                                                        </div>
+                                                        <div>
+                                                            <div className="font-semibold text-white group-hover:text-white transition-colors">
+                                                                {event.title}
+                                                            </div>
+                                                            {event.location && (
+                                                                <div className="text-sm flex items-center gap-1" style={{ color: colors.lighter }}>
+                                                                    <MapPin className="w-3 h-3" />
+                                                                    {event.location}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className="text-white/80">{formatDate(event.event_date)}</span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="flex items-center gap-2 text-white/80">
+                                                        <Clock className="w-4 h-4" style={{ color: colors.lighter }} />
+                                                        {formatTime12Hour(event.start_time)}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>{getStatusBadge(event.status)}</TableCell>
+                                                <TableCell className="text-right">
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        {/* Quick select button (visible on hover) */}
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                onSelectEvent?.(event);
+                                                            }}
+                                                            className="h-9 px-3 rounded-lg text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/10"
+                                                        >
+                                                            <span className="text-xs mr-1">Select</span>
+                                                            <ChevronRight className="w-4 h-4" />
+                                                        </Button>
+                                                        
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                                                <Button 
+                                                                    variant="ghost" 
+                                                                    size="sm"
+                                                                    className="h-9 w-9 rounded-lg p-0 text-white hover:bg-white/10"
+                                                                >
+                                                                    <MoreHorizontal className="w-5 h-5" />
+                                                                </Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent 
+                                                                align="end"
+                                                                className="rounded-xl border-0"
+                                                                style={{ 
+                                                                    background: colors.dark,
+                                                                    boxShadow: '0 20px 40px rgba(0,0,0,0.3)'
+                                                                }}
+                                                            >
+                                                                <DropdownMenuItem
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleEdit(event);
+                                                                    }}
+                                                                    className="text-white hover:bg-white/10 rounded-lg cursor-pointer"
+                                                                >
+                                                                    <Pencil className="w-4 h-4 mr-2" style={{ color: colors.lighter }} />
+                                                                    Edit Event
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuSeparator className="bg-white/10" />
+                                                                <DropdownMenuItem
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setSelectedEvent(event);
+                                                                        setShowDeleteDialog(true);
+                                                                    }}
+                                                                    className="text-red-400 hover:bg-red-500/10 rounded-lg cursor-pointer"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4 mr-2" />
+                                                                    Delete Event
+                                                                </DropdownMenuItem>
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
                         </div>
                     )}
-                </CardContent>
-            </Card>
+                </div>
+            </div>
 
             <EditEventDialog
                 open={showEditDialog}

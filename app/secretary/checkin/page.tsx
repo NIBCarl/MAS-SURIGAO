@@ -4,12 +4,11 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import Image from 'next/image';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, Camera, Plus, Users, Check, AlertCircle, WifiOff, CalendarPlus, ChevronDown, Calendar, ClipboardList } from 'lucide-react';
+import { Search, Camera, Plus, Users, Check, AlertCircle, WifiOff, CalendarPlus, Calendar, ClipboardList, QrCode, UserPlus, TrendingUp, X } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import db from '@/lib/db';
 import syncEngine from '@/lib/sync/engine';
@@ -28,6 +27,29 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { RefreshCw, CloudOff, Cloud } from 'lucide-react';
+
+// Enhanced Color System - 6 shades with proper hierarchy
+const colors = {
+  // Darkest - Page background
+  darkest: '#0F2C59',
+  // Dark - Cards/containers  
+  dark: '#1E5AA8',
+  // Base - Default surfaces
+  base: '#2B6CB0',
+  // Light - Interactive elements
+  light: '#4299E1',
+  // Lighter - Elevated elements
+  lighter: '#63B3ED',
+  // Lightest - Highlights
+  lightest: '#90CDF4',
+  // Gold accent
+  gold: '#D4AF37',
+  goldDark: '#B8860B',
+  // Semantic
+  success: '#10B981',
+  warning: '#F59E0B',
+  error: '#EF4444',
+};
 
 export default function SecretaryCheckInPage() {
   const { user } = useAuth();
@@ -265,6 +287,69 @@ export default function SecretaryCheckInPage() {
     await processMemberCheckIn(member);
   };
 
+  // Mark member as absent
+  const handleMarkAbsent = async (member: Member) => {
+    if (!todayEvent) {
+      setCheckInResult({
+        success: false,
+        message: 'No active event today',
+      });
+      setShowResult(true);
+      return;
+    }
+
+    // Check if already has attendance record
+    const existingCheckIn = await db.hasCheckedIn(
+      member.id || `local-${member.localId}`,
+      todayEvent.id || `local-${todayEvent.localId}`
+    );
+
+    if (existingCheckIn) {
+      setCheckInResult({
+        success: false,
+        alreadyCheckedIn: true,
+        previousCheckIn: formatCheckInTime(existingCheckIn.check_in_at),
+        message: `Already recorded at ${formatCheckInTime(existingCheckIn.check_in_at)}`,
+      });
+      setShowResult(true);
+      return;
+    }
+
+    // Create absent attendance record
+    const now = new Date().toISOString();
+    const attendance: Attendance = {
+      member_id: member.id || '',
+      member_local_id: member.localId,
+      event_id: todayEvent.id || '',
+      event_local_id: todayEvent.localId,
+      check_in_at: now,
+      status: 'absent',
+      method: 'manual',
+      notes: 'Marked absent by secretary',
+      recorded_by: user?.id,
+      created_at: now,
+      updated_at: now,
+      syncStatus: 'pending',
+    };
+
+    const localId = await db.attendance.add(attendance);
+    await db.addToSyncQueue('attendance', 'create', { ...attendance, localId });
+    setTodayAttendance((prev) => [...prev, { ...attendance, localId }]);
+
+    setCheckInResult({
+      success: true,
+      member,
+      status: 'absent',
+      message: `${member.full_name} - Marked as Absent`,
+    });
+    setShowResult(true);
+
+    // Auto-hide result after 3 seconds
+    setTimeout(() => {
+      setShowResult(false);
+    }, 3000);
+  };
+
   // Create new member
   const handleCreateMember = async () => {
     const qrCode = generateQRCode();
@@ -338,390 +423,699 @@ export default function SecretaryCheckInPage() {
   const earlyCount = todayAttendance.filter((a) => a.status === 'early').length;
   const onTimeCount = todayAttendance.filter((a) => a.status === 'on-time').length;
   const lateCount = todayAttendance.filter((a) => a.status === 'late').length;
+  const absentCount = todayAttendance.filter((a) => a.status === 'absent').length;
+
+  // Calculate attendance rate
+  const attendanceRate = members.length > 0 
+    ? Math.round((presentCount / members.length) * 100) 
+    : 0;
 
   return (
-    <div className="max-w-4xl mx-auto px-4 pb-8">
-      {/* Header with Live Counter */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <Image
-              src="/mas-logo.jpg"
-              alt="MAS-AMICUS Logo"
-              width={50}
-              height={50}
-              className="rounded-lg"
-            />
-            <div>
-              <h1 className="text-2xl font-bold text-[#0F2C59]">Check-In Hub</h1>
-              {/* Event Selector Dropdown */}
-              {allEvents.length > 0 ? (
-                <Select
-                  value={selectedEventId || ''}
-                  onValueChange={(value) => {
-                    setSelectedEventId(value);
-                    // Find and set the selected event
-                    const selected = allEvents.find(e => e.id === value || e.localId?.toString() === value);
-                    setTodayEvent(selected || null);
-                    // Load attendance for selected event (support both server and local IDs)
-                    if (selected) {
-                      const eventId = selected.id || `local-${selected.localId}`;
-                      db.getEventAttendance(eventId, selected.localId).then(setTodayAttendance);
-                    } else {
-                      setTodayAttendance([]);
-                    }
+    <div className="min-h-screen pb-8" style={{ background: `linear-gradient(180deg, ${colors.darkest} 0%, #1a365d 100%)` }}>
+      {/* Enhanced Header with Layering */}
+      <header 
+        className="sticky top-0 z-40 px-4 py-4 mb-6"
+        style={{ 
+          background: `linear-gradient(180deg, ${colors.dark} 0%, ${colors.darkest} 100%)`,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.1)'
+        }}
+      >
+        <div className="max-w-5xl mx-auto">
+          {/* Top Row: Logo, Title, Counter */}
+          <div className="flex items-center justify-between mb-4 gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+              <div 
+                className="p-1.5 sm:p-2 rounded-xl shrink-0"
+                style={{ 
+                  background: `linear-gradient(145deg, ${colors.light} 0%, ${colors.base} 100%)`,
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.2)'
+                }}
+              >
+                <Image
+                  src="/mas-logo.jpg"
+                  alt="MAS-AMICUS"
+                  width={36}
+                  height={36}
+                  className="rounded-lg w-8 h-8 sm:w-10 sm:h-10"
+                />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-white whitespace-nowrap">Check-In Hub</h1>
+                <p className="text-xs sm:text-sm" style={{ color: colors.lighter }}>Secretary</p>
+              </div>
+            </div>
+
+            {/* Live Counter Card - Elevated */}
+            <div 
+              className="flex items-center gap-2 sm:gap-4 px-3 sm:px-4 py-2 sm:py-3 rounded-xl sm:rounded-2xl shrink-0"
+              style={{ 
+                background: `linear-gradient(145deg, ${colors.light} 0%, ${colors.base} 100%)`,
+                boxShadow: '0 8px 24px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.15)'
+              }}
+            >
+              <div className="text-right">
+                <div className="flex items-baseline gap-0.5 sm:gap-1">
+                  <span className="text-2xl sm:text-3xl font-bold text-white">{presentCount}</span>
+                  <span className="text-sm sm:text-lg text-white/60">/{members.length}</span>
+                </div>
+                <div className="text-[10px] sm:text-xs text-white/80 font-medium uppercase tracking-wider">Present</div>
+              </div>
+              <div 
+                className="w-9 h-9 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl flex items-center justify-center"
+                style={{ 
+                  background: 'rgba(255,255,255,0.15)',
+                  boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)'
+                }}
+              >
+                <TrendingUp className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
+              </div>
+            </div>
+          </div>
+
+          {/* Middle Row: Event Selector & Create Button */}
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-4">
+            {allEvents.length > 0 ? (
+              <Select
+                value={selectedEventId || ''}
+                onValueChange={(value) => {
+                  setSelectedEventId(value);
+                  const selected = allEvents.find(e => e.id === value || e.localId?.toString() === value);
+                  setTodayEvent(selected || null);
+                  if (selected) {
+                    const eventId = selected.id || `local-${selected.localId}`;
+                    db.getEventAttendance(eventId, selected.localId).then(setTodayAttendance);
+                  } else {
+                    setTodayAttendance([]);
+                  }
+                }}
+              >
+                <SelectTrigger 
+                  className="flex-1 h-11 sm:h-12 rounded-xl border-0 text-white text-sm sm:text-base"
+                  style={{ 
+                    background: `linear-gradient(145deg, ${colors.dark} 0%, ${colors.darkest} 100%)`,
+                    boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.05)'
                   }}
                 >
-                  <SelectTrigger className="w-[240px] mt-1 border-[#D4AF37]/30 text-[#0F2C59]">
-                    <SelectValue placeholder="Select an event" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {allEvents.map((event) => (
-                      <SelectItem
-                        key={event.id || event.localId}
-                        value={event.id || event.localId?.toString() || ''}
-                      >
-                        {event.title} - {event.event_date}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <p className="text-[#0F2C59]/60">
-                  No events available - Create one to start!
-                </p>
-              )}
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
+                  <Calendar className="w-4 h-4 sm:w-5 sm:h-5 mr-2 shrink-0" style={{ color: colors.gold }} />
+                  <SelectValue placeholder="Select an event" />
+                </SelectTrigger>
+                <SelectContent 
+                  className="rounded-xl border-0"
+                  style={{ 
+                    background: colors.dark,
+                    boxShadow: '0 20px 40px rgba(0,0,0,0.3)'
+                  }}
+                >
+                  {allEvents.map((event) => (
+                    <SelectItem
+                      key={event.id || event.localId}
+                      value={event.id || event.localId?.toString() || ''}
+                      className="text-white hover:bg-white/10 rounded-lg"
+                    >
+                      {event.title} - {event.event_date}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <div 
+                className="flex-1 h-11 sm:h-12 flex items-center px-4 rounded-xl text-white/60 text-sm sm:text-base"
+                style={{ background: 'rgba(0,0,0,0.2)' }}
+              >
+                No events available
+              </div>
+            )}
+
             <Button
               onClick={() => setShowCreateEventDialog(true)}
-              variant="outline"
-              className="border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37]/10"
+              className="h-11 sm:h-12 px-4 sm:px-6 rounded-xl font-semibold text-white border-0 text-sm sm:text-base"
+              style={{ 
+                background: `linear-gradient(145deg, ${colors.gold} 0%, ${colors.goldDark} 100%)`,
+                boxShadow: '0 4px 12px rgba(212,175,55,0.3), inset 0 1px 0 rgba(255,255,255,0.3)'
+              }}
             >
-              <CalendarPlus className="w-4 h-4 mr-2" />
-              Create Event
+              <CalendarPlus className="w-4 h-4 sm:w-5 sm:h-5 mr-2 shrink-0" />
+              <span className="hidden sm:inline">Create Event</span>
+              <span className="sm:hidden">Create</span>
             </Button>
-            <div className="text-right">
-              <div className="text-3xl font-bold text-[#1E5AA8]">
-                {presentCount}
-                <span className="text-lg text-[#0F2C59]/40">/{members.length}</span>
-              </div>
-              <div className="text-sm text-[#0F2C59]/60">Present</div>
-            </div>
           </div>
-        </div>
 
-        {/* Status Pills */}
-        <div className="flex gap-2 flex-wrap items-center">
-          <Badge className="bg-green-100 text-green-800">
-            Early: {earlyCount}
-          </Badge>
-          <Badge className="bg-blue-100 text-blue-800">
-            On-time: {onTimeCount}
-          </Badge>
-          <Badge className="bg-yellow-100 text-yellow-800">
-            Late: {lateCount}
-          </Badge>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleManualSync}
-            disabled={!isOnline || isSyncing}
-            className={`ml-2 h-6 text-xs px-2 ${isSyncing ? 'animate-pulse' : ''} ${!isOnline ? 'border-dashed text-gray-400' : 'border-[#1E5AA8] text-[#1E5AA8]'}`}
-          >
-            {isSyncing ? (
-              <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
-            ) : isOnline ? (
-              <Cloud className="w-3 h-3 mr-1" />
-            ) : (
-              <CloudOff className="w-3 h-3 mr-1" />
-            )}
-            {isSyncing ? 'Syncing...' : isOnline ? 'Sync Now' : 'Offline'}
-          </Button>
-
-          {!isOnline && (
-            <Badge variant="outline" className="border-yellow-400 text-yellow-700">
-              <WifiOff className="w-3 h-3 mr-1" />
-              Offline Mode
-            </Badge>
-          )}
-        </div>
-      </div>
-
-      {/* Check-in Result Overlay */}
-      {showResult && checkInResult && (
-        <div
-          className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${checkInResult.success ? 'bg-green-500/90' : checkInResult.alreadyCheckedIn ? 'bg-yellow-500/90' : 'bg-red-500/90'
-            }`}
-          onClick={() => setShowResult(false)}
-        >
-          <div
-            className="bg-white rounded-2xl p-8 text-center max-w-sm w-full animate-check-in relative"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Close Button */}
-            <button
-              onClick={() => setShowResult(false)}
-              className="absolute top-3 right-3 w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
-              aria-label="Close"
+          {/* Bottom Row: Status Pills & Sync */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Status Pills - Light elevated style */}
+            <div 
+              className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-xl"
+              style={{ 
+                background: `linear-gradient(145deg, ${colors.light} 0%, ${colors.base} 100%)`,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.1)'
+              }}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-            </button>
-
-            <div className={`w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center ${checkInResult.success ? 'bg-green-100' : checkInResult.alreadyCheckedIn ? 'bg-yellow-100' : 'bg-red-100'
-              }`}>
-              {checkInResult.success ? (
-                <Check className="w-10 h-10 text-green-600" />
-              ) : (
-                <AlertCircle className="w-10 h-10 text-red-600" />
+              <span className="text-xs font-semibold text-white/80 uppercase tracking-wider mr-1">Status:</span>
+              <Badge 
+                className="bg-emerald-400/20 text-emerald-100 border-0 font-semibold"
+                style={{ boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
+              >
+                Early: {earlyCount}
+              </Badge>
+              <Badge 
+                className="bg-blue-400/20 text-blue-100 border-0 font-semibold"
+                style={{ boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
+              >
+                On-time: {onTimeCount}
+              </Badge>
+              <Badge 
+                className="bg-amber-400/20 text-amber-100 border-0 font-semibold"
+                style={{ boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
+              >
+                Late: {lateCount}
+              </Badge>
+              {absentCount > 0 && (
+                <Badge 
+                  className="bg-red-400/20 text-red-100 border-0 font-semibold"
+                  style={{ boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
+                >
+                  Absent: {absentCount}
+                </Badge>
               )}
             </div>
-            <h2 className="text-2xl font-bold text-[#0F2C59] mb-2">
-              {checkInResult.success ? 'Success!' : checkInResult.alreadyCheckedIn ? 'Already Checked In' : 'Error'}
-            </h2>
-            <p className="text-[#0F2C59]/70">{checkInResult.message}</p>
+
+            <div className="flex-1" />
+
+            {/* Sync Button - Dark recessed style */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleManualSync}
+              disabled={!isOnline || isSyncing}
+              className={`h-10 px-4 rounded-xl border-0 text-white transition-all ${
+                isSyncing ? 'animate-pulse' : ''
+              } ${!isOnline ? 'opacity-50' : ''}`}
+              style={{ 
+                background: `linear-gradient(145deg, ${colors.dark} 0%, ${colors.darkest} 100%)`,
+                boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.05)'
+              }}
+            >
+              {isSyncing ? (
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+              ) : isOnline ? (
+                <Cloud className="w-4 h-4 mr-2" style={{ color: colors.lighter }} />
+              ) : (
+                <CloudOff className="w-4 h-4 mr-2 text-gray-400" />
+              )}
+              <span className="hidden sm:inline">
+                {isSyncing ? 'Syncing...' : isOnline ? 'Sync Now' : 'Offline'}
+              </span>
+            </Button>
+
+            {!isOnline && (
+              <Badge 
+                variant="outline" 
+                className="h-10 px-3 rounded-xl border-amber-400/50 text-amber-300 bg-amber-400/10"
+              >
+                <WifiOff className="w-4 h-4 mr-2" />
+                <span className="hidden sm:inline">Offline Mode</span>
+              </Badge>
+            )}
           </div>
         </div>
-      )}
+      </header>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5 bg-[#FDF8F3] border border-[#D4AF37]/20">
-          <TabsTrigger value="scan" className="data-[state=active]:bg-[#1E5AA8] data-[state=active]:text-white text-xs sm:text-sm">
-            <Camera className="w-4 h-4 mr-1 sm:mr-2" />
-            <span className="hidden sm:inline">Scan</span>
-          </TabsTrigger>
-          <TabsTrigger value="search" className="data-[state=active]:bg-[#1E5AA8] data-[state=active]:text-white text-xs sm:text-sm">
-            <Search className="w-4 h-4 mr-1 sm:mr-2" />
-            <span className="hidden sm:inline">Search</span>
-          </TabsTrigger>
-          <TabsTrigger value="add" className="data-[state=active]:bg-[#1E5AA8] data-[state=active]:text-white text-xs sm:text-sm">
-            <Plus className="w-4 h-4 mr-1 sm:mr-2" />
-            <span className="hidden sm:inline">Add</span>
-          </TabsTrigger>
-          <TabsTrigger value="attendance" className="data-[state=active]:bg-[#1E5AA8] data-[state=active]:text-white text-xs sm:text-sm">
-            <ClipboardList className="w-4 h-4 mr-1 sm:mr-2" />
-            <span className="hidden sm:inline">Attendance</span>
-          </TabsTrigger>
-          <TabsTrigger value="events" className="data-[state=active]:bg-[#1E5AA8] data-[state=active]:text-white text-xs sm:text-sm">
-            <Calendar className="w-4 h-4 mr-1 sm:mr-2" />
-            <span className="hidden sm:inline">Events</span>
-          </TabsTrigger>
-        </TabsList>
+      <main className="max-w-5xl mx-auto px-4">
+        {/* Check-in Result Overlay */}
+        {showResult && checkInResult && (
+          <div
+            className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${
+              checkInResult.success 
+                ? 'bg-emerald-500/95' 
+                : checkInResult.alreadyCheckedIn 
+                  ? 'bg-amber-500/95' 
+                  : 'bg-red-500/95'
+            }`}
+            onClick={() => setShowResult(false)}
+          >
+            <div
+              className="rounded-3xl p-8 text-center max-w-sm w-full animate-check-in relative"
+              style={{ 
+                background: `linear-gradient(145deg, ${colors.lightest} 0%, white 100%)`,
+                boxShadow: '0 20px 60px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.5)'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Close Button */}
+              <button
+                onClick={() => setShowResult(false)}
+                className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center transition-colors"
+                style={{ 
+                  background: colors.darkest,
+                  color: 'white',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
+                }}
+                aria-label="Close"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
 
-        {/* Scan Tab */}
-        <TabsContent value="scan">
-          <Card className="border-[#D4AF37]/20">
-            <CardContent className="p-6">
-              {isScanning ? (
-                <div className="space-y-4">
-                  <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-                    <video ref={videoRef} className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 border-2 border-[#D4AF37] m-8 rounded-lg" />
-                  </div>
-                  <Button
-                    onClick={stopScanning}
-                    variant="outline"
-                    className="w-full border-[#1E5AA8] text-[#1E5AA8]"
-                  >
-                    Stop Scanning
-                  </Button>
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <div className="w-20 h-20 rounded-full bg-[#1E5AA8]/10 flex items-center justify-center mx-auto mb-4">
-                    <Camera className="w-10 h-10 text-[#1E5AA8]" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-[#0F2C59] mb-2">
-                    QR Scanner
-                  </h3>
-                  <p className="text-[#0F2C59]/60 mb-4">
-                    Point camera at member&apos;s QR code
-                  </p>
-                  <Button
-                    onClick={startScanning}
-                    className="bg-[#1E5AA8] hover:bg-[#154785]"
-                  >
-                    Start Scanning
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Search Tab */}
-        <TabsContent value="search">
-          <Card className="border-[#D4AF37]/20">
-            <CardHeader>
-              <CardTitle className="text-[#0F2C59] flex items-center gap-2">
-                <Users className="w-5 h-5 text-[#D4AF37]" />
-                Find Member
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Input
-                placeholder="Search by name or phone..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="border-[#1E5AA8]/20"
-              />
-
-              <div className="space-y-2 max-h-96 overflow-y-auto">
-                {filteredMembers.map((member) => {
-                  const isCheckedIn = todayAttendance.some(
-                    (a) => a.member_id === member.id || a.member_local_id === member.localId
-                  );
-
-                  return (
-                    <div
-                      key={member.localId}
-                      className="flex items-center justify-between p-3 bg-white rounded-lg border border-[#D4AF37]/10"
-                    >
-                      <div>
-                        <div className="font-medium text-[#0F2C59]">{member.full_name}</div>
-                        <div className="text-sm text-[#0F2C59]/60">{member.phone}</div>
-                      </div>
-                      {isCheckedIn ? (
-                        <Badge className="bg-green-100 text-green-800">
-                          <Check className="w-3 h-3 mr-1" />
-                          Checked In
-                        </Badge>
-                      ) : (
-                        <Button
-                          size="sm"
-                          onClick={() => handleManualCheckIn(member)}
-                          className="bg-[#1E5AA8] hover:bg-[#154785]"
-                        >
-                          Check In
-                        </Button>
-                      )}
-                    </div>
-                  );
-                })}
+              <div 
+                className="w-24 h-24 rounded-2xl mx-auto mb-6 flex items-center justify-center"
+                style={{ 
+                  background: checkInResult.success 
+                    ? `linear-gradient(145deg, #10B981 0%, #059669 100%)`
+                    : checkInResult.alreadyCheckedIn
+                      ? `linear-gradient(145deg, #F59E0B 0%, #D97706 100%)`
+                      : `linear-gradient(145deg, #EF4444 0%, #DC2626 100%)`,
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.3)'
+                }}
+              >
+                {checkInResult.success ? (
+                  <Check className="w-12 h-12 text-white" />
+                ) : (
+                  <AlertCircle className="w-12 h-12 text-white" />
+                )}
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              
+              <h2 className="text-2xl font-bold mb-2" style={{ color: colors.darkest }}>
+                {checkInResult.success ? 'Success!' : checkInResult.alreadyCheckedIn ? 'Already Checked In' : 'Error'}
+              </h2>
+              <p className="text-lg" style={{ color: colors.dark }}>{checkInResult.message}</p>
+            </div>
+          </div>
+        )}
 
-        {/* Add Member Tab */}
-        <TabsContent value="add">
-          <Card className="border-[#D4AF37]/20">
-            <CardHeader>
-              <CardTitle className="text-[#0F2C59] flex items-center gap-2">
-                <Plus className="w-5 h-5 text-[#D4AF37]" />
-                Quick Add Member
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {!generatedQR ? (
-                <>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-[#0F2C59]">Full Name *</label>
-                    <Input
-                      value={newMember.full_name}
-                      onChange={(e) => setNewMember({ ...newMember, full_name: e.target.value })}
-                      placeholder="Enter full name"
-                      className="border-[#1E5AA8]/20"
-                    />
-                  </div>
+        {/* Enhanced Tabs with Better Styling */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList 
+            className="grid w-full grid-cols-5 h-16 p-1.5 rounded-2xl border-0"
+            style={{ 
+              background: `linear-gradient(145deg, ${colors.dark} 0%, ${colors.darkest} 100%)`,
+              boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.05)'
+            }}
+          >
+            {[
+              { value: 'scan', icon: Camera, label: 'Scan' },
+              { value: 'search', icon: Search, label: 'Search' },
+              { value: 'add', icon: UserPlus, label: 'Add' },
+              { value: 'attendance', icon: ClipboardList, label: 'List' },
+              { value: 'events', icon: Calendar, label: 'Events' },
+            ].map((tab) => (
+              <TabsTrigger
+                key={tab.value}
+                value={tab.value}
+                className="rounded-xl transition-all duration-200 data-[state=active]:shadow-lg"
+                style={{ 
+                  color: colors.lighter,
+                }}
+                data-state-active-style={{
+                  background: `linear-gradient(145deg, ${colors.light} 0%, ${colors.base} 100%)`,
+                  color: 'white',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.2)'
+                }}
+              >
+                <tab.icon className="w-5 h-5 sm:mr-2" />
+                <span className="hidden sm:inline text-sm font-semibold">{tab.label}</span>
+              </TabsTrigger>
+            ))}
+          </TabsList>
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-[#0F2C59]">Phone *</label>
-                    <Input
-                      value={newMember.phone}
-                      onChange={(e) => setNewMember({ ...newMember, phone: e.target.value })}
-                      placeholder="09XX XXX XXXX"
-                      className="border-[#1E5AA8]/20"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-[#0F2C59]">Email (Optional)</label>
-                    <Input
-                      type="email"
-                      value={newMember.email}
-                      onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
-                      placeholder="email@example.com"
-                      className="border-[#1E5AA8]/20"
-                    />
-                  </div>
-
-                  <Button
-                    onClick={handleCreateMember}
-                    disabled={!newMember.full_name || !newMember.phone}
-                    className="w-full bg-[#D4AF37] hover:bg-[#B8860B] text-white"
-                  >
-                    Generate QR Code
-                  </Button>
-                </>
-              ) : (
-                <div className="text-center space-y-4">
-                  <Alert className="bg-green-50 border-green-200">
-                    <Check className="h-4 w-4 text-green-600" />
-                    <AlertDescription className="text-green-800">
-                      Member created successfully!
-                    </AlertDescription>
-                  </Alert>
-
-                  <div className="p-4 bg-white rounded-xl border-2 border-[#D4AF37]/20 inline-block">
-                    {/* QR Code would be rendered here */}
-                    <div className="w-48 h-48 bg-gray-100 flex items-center justify-center text-gray-400">
-                      QR: {generatedQR.slice(0, 8)}...
+          {/* Scan Tab - Enhanced */}
+          <TabsContent value="scan">
+            <div 
+              className="rounded-3xl overflow-hidden"
+              style={{ 
+                background: `linear-gradient(145deg, ${colors.dark} 0%, ${colors.darkest} 100%)`,
+                boxShadow: '0 8px 32px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.1)'
+              }}
+            >
+              <div className="p-6 sm:p-8">
+                {isScanning ? (
+                  <div className="space-y-6">
+                    <div 
+                      className="relative aspect-video rounded-2xl overflow-hidden"
+                      style={{ 
+                        background: '#000',
+                        boxShadow: 'inset 0 4px 20px rgba(0,0,0,0.5)'
+                      }}
+                    >
+                      <video ref={videoRef} className="w-full h-full object-cover" />
+                      {/* Scanner frame overlay */}
+                      <div 
+                        className="absolute inset-8 border-2 rounded-2xl pointer-events-none"
+                        style={{ 
+                          borderColor: colors.gold,
+                          boxShadow: '0 0 0 4px rgba(212,175,55,0.2), inset 0 0 20px rgba(212,175,55,0.1)'
+                        }}
+                      >
+                        {/* Corner markers */}
+                        <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-white -mt-1 -ml-1" />
+                        <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-white -mt-1 -mr-1" />
+                        <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-white -mb-1 -ml-1" />
+                        <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-white -mb-1 -mr-1" />
+                      </div>
                     </div>
+                    <Button
+                      onClick={stopScanning}
+                      className="w-full h-14 rounded-xl font-semibold text-white border-0"
+                      style={{ 
+                        background: `linear-gradient(145deg, ${colors.error} 0%, #DC2626 100%)`,
+                        boxShadow: '0 4px 12px rgba(239,68,68,0.3), inset 0 1px 0 rgba(255,255,255,0.2)'
+                      }}
+                    >
+                      Stop Scanning
+                    </Button>
                   </div>
+                ) : (
+                  <div className="text-center py-12 sm:py-16">
+                    <div 
+                      className="w-28 h-28 rounded-3xl flex items-center justify-center mx-auto mb-8"
+                      style={{ 
+                        background: `linear-gradient(145deg, ${colors.light} 0%, ${colors.base} 100%)`,
+                        boxShadow: '0 12px 32px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.2)'
+                      }}
+                    >
+                      <QrCode className="w-14 h-14 text-white" />
+                    </div>
+                    <h3 className="text-2xl sm:text-3xl font-bold text-white mb-3">
+                      QR Scanner
+                    </h3>
+                    <p className="text-lg mb-8" style={{ color: colors.lighter }}>
+                      Point camera at member&apos;s QR code to check in
+                    </p>
+                    <Button
+                      onClick={startScanning}
+                      className="h-14 px-10 rounded-xl font-semibold text-white text-lg border-0"
+                      style={{ 
+                        background: `linear-gradient(145deg, ${colors.gold} 0%, ${colors.goldDark} 100%)`,
+                        boxShadow: '0 8px 24px rgba(212,175,55,0.3), inset 0 1px 0 rgba(255,255,255,0.3)'
+                      }}
+                    >
+                      <Camera className="w-6 h-6 mr-3" />
+                      Start Scanning
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </TabsContent>
 
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={() => setGeneratedQR(null)}
-                      variant="outline"
-                      className="flex-1 border-[#1E5AA8]"
-                    >
-                      Add Another
-                    </Button>
-                    <Button
-                      onClick={() => setActiveTab('scan')}
-                      className="flex-1 bg-[#1E5AA8] hover:bg-[#154785]"
-                    >
-                      Scan Now
-                    </Button>
+          {/* Search Tab - Enhanced */}
+          <TabsContent value="search">
+            <div 
+              className="rounded-3xl overflow-hidden"
+              style={{ 
+                background: `linear-gradient(145deg, ${colors.dark} 0%, ${colors.darkest} 100%)`,
+                boxShadow: '0 8px 32px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.1)'
+              }}
+            >
+              <div className="p-6 sm:p-8">
+                <div className="flex items-center gap-3 mb-6">
+                  <div 
+                    className="w-12 h-12 rounded-xl flex items-center justify-center"
+                    style={{ 
+                      background: `linear-gradient(145deg, ${colors.gold} 0%, ${colors.goldDark} 100%)`,
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.2)'
+                    }}
+                  >
+                    <Users className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-white">Find Member</h2>
+                    <p className="text-sm" style={{ color: colors.lighter }}>Search by name or phone number</p>
                   </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
 
-        {/* Attendance Tab */}
-        <TabsContent value="attendance">
-          <AttendanceList
-            event={todayEvent}
-            members={members}
-            attendance={todayAttendance}
-            onRefresh={loadData}
-          />
-        </TabsContent>
+                {/* Search Input - Recessed style */}
+                <div className="relative mb-6">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5" style={{ color: colors.lighter }} />
+                  <Input
+                    placeholder="Search members..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="h-14 pl-12 rounded-xl border-0 text-white text-lg"
+                    style={{ 
+                      background: `linear-gradient(145deg, ${colors.darkest} 0%, #0a1f3d 100%)`,
+                      boxShadow: 'inset 0 3px 6px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.05)'
+                    }}
+                  />
+                </div>
 
-        {/* Events Tab */}
-        <TabsContent value="events">
-          <EventManagement
-            events={allEvents}
-            onRefresh={loadData}
-            onSelectEvent={(event) => {
-              setSelectedEventId(event.id || event.localId?.toString() || null);
-              setTodayEvent(event);
-              const eventId = event.id || `local-${event.localId}`;
-              db.getEventAttendance(eventId, event.localId).then(setTodayAttendance);
-              setActiveTab('attendance');
-            }}
-          />
-        </TabsContent>
-      </Tabs>
+                {/* Member List */}
+                <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                  {filteredMembers.length === 0 ? (
+                    <div className="text-center py-8" style={{ color: colors.lighter }}>
+                      <Users className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                      <p>No members found</p>
+                    </div>
+                  ) : (
+                    filteredMembers.map((member) => {
+                      const isCheckedIn = todayAttendance.some(
+                        (a) => a.member_id === member.id || a.member_local_id === member.localId
+                      );
+
+                      return (
+                        <div
+                          key={member.localId}
+                          className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl transition-all gap-3"
+                          style={{ 
+                            background: `linear-gradient(145deg, ${colors.light} 0%, ${colors.base} 100%)`,
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.1)'
+                          }}
+                        >
+                          {/* Member Info - Always visible */}
+                          <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+                            <div 
+                              className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center text-lg sm:text-xl font-bold shrink-0"
+                              style={{ 
+                                background: 'rgba(255,255,255,0.15)',
+                                color: 'white'
+                              }}
+                            >
+                              {member.full_name.charAt(0).toUpperCase()}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="font-semibold text-white text-base sm:text-lg truncate">{member.full_name}</div>
+                              <div className="text-xs sm:text-sm truncate" style={{ color: colors.lighter }}>{member.phone}</div>
+                            </div>
+                          </div>
+                          
+                          {/* Action Button/Badge - Full width on mobile, auto on desktop */}
+                          {isCheckedIn ? (
+                            <Badge 
+                              className="h-10 px-4 rounded-lg text-sm font-semibold border-0 w-full sm:w-auto justify-center"
+                              style={{ 
+                                background: 'rgba(16,185,129,0.2)',
+                                color: '#10B981',
+                                boxShadow: '0 2px 8px rgba(16,185,129,0.2)'
+                              }}
+                            >
+                              <Check className="w-4 h-4 mr-2 shrink-0" />
+                              <span className="hidden sm:inline">Checked In</span>
+                              <span className="sm:hidden">Checked</span>
+                            </Badge>
+                          ) : (
+                            <div className="flex gap-2 w-full sm:w-auto">
+                              <Button
+                                size="sm"
+                                onClick={() => handleManualCheckIn(member)}
+                                className="h-10 px-4 rounded-lg font-semibold text-white border-0 flex-1 sm:flex-none"
+                                style={{ 
+                                  background: `linear-gradient(145deg, ${colors.gold} 0%, ${colors.goldDark} 100%)`,
+                                  boxShadow: '0 4px 12px rgba(212,175,55,0.3), inset 0 1px 0 rgba(255,255,255,0.3)'
+                                }}
+                              >
+                                <span className="hidden sm:inline">Check In</span>
+                                <span className="sm:hidden">Check In</span>
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => handleMarkAbsent(member)}
+                                className="h-10 px-3 rounded-lg font-semibold border-0 text-white flex-none"
+                                style={{ 
+                                  background: `linear-gradient(145deg, ${colors.error} 0%, #DC2626 100%)`,
+                                  boxShadow: '0 4px 12px rgba(239,68,68,0.3), inset 0 1px 0 rgba(255,255,255,0.2)'
+                                }}
+                              >
+                                <span className="hidden sm:inline">Absent</span>
+                                <span className="sm:hidden">✕</span>
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* Add Member Tab - Enhanced */}
+          <TabsContent value="add">
+            <div 
+              className="rounded-3xl overflow-hidden"
+              style={{ 
+                background: `linear-gradient(145deg, ${colors.dark} 0%, ${colors.darkest} 100%)`,
+                boxShadow: '0 8px 32px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.1)'
+              }}
+            >
+              <div className="p-6 sm:p-8">
+                <div className="flex items-center gap-3 mb-6">
+                  <div 
+                    className="w-12 h-12 rounded-xl flex items-center justify-center"
+                    style={{ 
+                      background: `linear-gradient(145deg, ${colors.gold} 0%, ${colors.goldDark} 100%)`,
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.2)'
+                    }}
+                  >
+                    <UserPlus className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-white">Quick Add Member</h2>
+                    <p className="text-sm" style={{ color: colors.lighter }}>Register new member and generate QR</p>
+                  </div>
+                </div>
+
+                {!generatedQR ? (
+                  <div className="space-y-5">
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-white/80 uppercase tracking-wider">Full Name *</label>
+                      <Input
+                        value={newMember.full_name}
+                        onChange={(e) => setNewMember({ ...newMember, full_name: e.target.value })}
+                        placeholder="Enter full name"
+                        className="h-14 rounded-xl border-0 text-white text-lg"
+                        style={{ 
+                          background: `linear-gradient(145deg, ${colors.darkest} 0%, #0a1f3d 100%)`,
+                          boxShadow: 'inset 0 3px 6px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.05)'
+                        }}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-white/80 uppercase tracking-wider">Phone *</label>
+                      <Input
+                        value={newMember.phone}
+                        onChange={(e) => setNewMember({ ...newMember, phone: e.target.value })}
+                        placeholder="09XX XXX XXXX"
+                        className="h-14 rounded-xl border-0 text-white text-lg"
+                        style={{ 
+                          background: `linear-gradient(145deg, ${colors.darkest} 0%, #0a1f3d 100%)`,
+                          boxShadow: 'inset 0 3px 6px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.05)'
+                        }}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-white/80 uppercase tracking-wider">Email (Optional)</label>
+                      <Input
+                        type="email"
+                        value={newMember.email}
+                        onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
+                        placeholder="email@example.com"
+                        className="h-14 rounded-xl border-0 text-white text-lg"
+                        style={{ 
+                          background: `linear-gradient(145deg, ${colors.darkest} 0%, #0a1f3d 100%)`,
+                          boxShadow: 'inset 0 3px 6px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.05)'
+                        }}
+                      />
+                    </div>
+
+                    <Button
+                      onClick={handleCreateMember}
+                      disabled={!newMember.full_name || !newMember.phone}
+                      className="w-full h-14 rounded-xl font-semibold text-white text-lg border-0 disabled:opacity-50"
+                      style={{ 
+                        background: `linear-gradient(145deg, ${colors.gold} 0%, ${colors.goldDark} 100%)`,
+                        boxShadow: '0 8px 24px rgba(212,175,55,0.3), inset 0 1px 0 rgba(255,255,255,0.3)'
+                      }}
+                    >
+                      <QrCode className="w-6 h-6 mr-3" />
+                      Generate QR Code
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="text-center space-y-6">
+                    <Alert 
+                      className="rounded-xl border-0"
+                      style={{ 
+                        background: 'rgba(16,185,129,0.15)',
+                        boxShadow: '0 4px 12px rgba(16,185,129,0.1)'
+                      }}
+                    >
+                      <Check className="h-5 w-5 text-emerald-400" />
+                      <AlertDescription className="text-emerald-100 font-medium">
+                        Member created successfully!
+                      </AlertDescription>
+                    </Alert>
+
+                    <div 
+                      className="p-6 rounded-2xl inline-block"
+                      style={{ 
+                        background: `linear-gradient(145deg, ${colors.lightest} 0%, white 100%)`,
+                        boxShadow: '0 12px 32px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.5)'
+                      }}
+                    >
+                      <div 
+                        className="w-48 h-48 rounded-xl flex items-center justify-center text-gray-400"
+                        style={{ background: '#f3f4f6' }}
+                      >
+                        QR: {generatedQR.slice(0, 8)}...
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <Button
+                        onClick={() => setGeneratedQR(null)}
+                        variant="outline"
+                        className="flex-1 h-14 rounded-xl font-semibold border-2 text-white hover:bg-white/10"
+                        style={{ borderColor: colors.lighter }}
+                      >
+                        Add Another
+                      </Button>
+                      <Button
+                        onClick={() => setActiveTab('scan')}
+                        className="flex-1 h-14 rounded-xl font-semibold text-white border-0"
+                        style={{ 
+                          background: `linear-gradient(145deg, ${colors.light} 0%, ${colors.base} 100%)`,
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.2)'
+                        }}
+                      >
+                        Scan Now
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* Attendance Tab */}
+          <TabsContent value="attendance">
+            <AttendanceList
+              event={todayEvent}
+              members={members}
+              attendance={todayAttendance}
+              onRefresh={loadData}
+            />
+          </TabsContent>
+
+          {/* Events Tab */}
+          <TabsContent value="events">
+            <EventManagement
+              events={allEvents}
+              onRefresh={loadData}
+              onSelectEvent={(event) => {
+                setSelectedEventId(event.id || event.localId?.toString() || null);
+                setTodayEvent(event);
+                const eventId = event.id || `local-${event.localId}`;
+                db.getEventAttendance(eventId, event.localId).then(setTodayAttendance);
+                setActiveTab('attendance');
+              }}
+            />
+          </TabsContent>
+        </Tabs>
+      </main>
 
       {/* Create Event Dialog */}
       <CreateEventDialog

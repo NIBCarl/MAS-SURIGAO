@@ -6,6 +6,17 @@ import { useAuth } from '@/hooks/useAuth';
 import { OfflineIndicator } from '@/components/shared/OfflineIndicator';
 import { Loader2 } from 'lucide-react';
 
+// Enhanced color system
+const colors = {
+  darkest: '#0F2C59',
+  dark: '#1E5AA8',
+  base: '#2B6CB0',
+  light: '#4299E1',
+  lighter: '#63B3ED',
+  lightest: '#90CDF4',
+  gold: '#D4AF37',
+};
+
 export default function SecretaryLayout({
   children,
 }: {
@@ -27,8 +38,22 @@ export default function SecretaryLayout({
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#FDF8F3]">
-        <Loader2 className="h-8 w-8 animate-spin text-[#1E5AA8]" />
+      <div 
+        className="min-h-screen flex items-center justify-center"
+        style={{ 
+          background: `linear-gradient(180deg, ${colors.darkest} 0%, #1a365d 100%)`
+        }}
+      >
+        <div 
+          className="p-8 rounded-2xl flex flex-col items-center gap-4"
+          style={{ 
+            background: `linear-gradient(145deg, ${colors.dark} 0%, ${colors.darkest} 100%)`,
+            boxShadow: '0 12px 32px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.1)'
+          }}
+        >
+          <Loader2 className="h-10 w-10 animate-spin" style={{ color: colors.gold }} />
+          <p className="text-white font-medium">Loading Secretary Dashboard...</p>
+        </div>
       </div>
     );
   }
@@ -38,9 +63,14 @@ export default function SecretaryLayout({
   }
 
   return (
-    <div className="min-h-screen bg-[#FDF8F3]">
+    <div 
+      className="min-h-screen"
+      style={{ 
+        background: `linear-gradient(180deg, ${colors.darkest} 0%, #1a365d 100%)`
+      }}
+    >
       <OfflineIndicator />
-      <main className="pt-8">{children}</main>
+      {children}
     </div>
   );
 }

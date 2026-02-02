@@ -55,9 +55,9 @@ export function EditAttendanceDialog({
     const handleSave = async () => {
         setError(null);
 
-        // Require notes for excused status
-        if (status === 'excused' && !notes.trim()) {
-            setError('Please provide a reason for excused status');
+        // Require notes for excused or absent status
+        if ((status === 'excused' || status === 'absent') && !notes.trim()) {
+            setError(`Please provide a reason for ${status} status`);
             return;
         }
 
@@ -136,13 +136,16 @@ export function EditAttendanceDialog({
                                 <SelectItem value="excused">
                                     <span className="text-purple-600">● Excused</span>
                                 </SelectItem>
+                                <SelectItem value="absent">
+                                    <span className="text-red-600">● Absent</span>
+                                </SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
 
                     <div className="space-y-2">
                         <Label>
-                            Notes / Reason {status === 'excused' && <span className="text-red-500">*</span>}
+                            Notes / Reason {(status === 'excused' || status === 'absent') && <span className="text-red-500">*</span>}
                         </Label>
                         <Textarea
                             value={notes}
@@ -150,12 +153,14 @@ export function EditAttendanceDialog({
                             placeholder={
                                 status === 'excused'
                                     ? 'Reason for absence (required)...'
-                                    : 'Optional notes...'
+                                    : status === 'absent'
+                                        ? 'Reason for marking absent (required)...'
+                                        : 'Optional notes...'
                             }
                             className="border-[#1E5AA8]/20 min-h-[80px]"
                         />
-                        {status === 'excused' && !notes.trim() && (
-                            <p className="text-xs text-red-500">Reason is required for excused status</p>
+                        {(status === 'excused' || status === 'absent') && !notes.trim() && (
+                            <p className="text-xs text-red-500">Reason is required for {status} status</p>
                         )}
                     </div>
 

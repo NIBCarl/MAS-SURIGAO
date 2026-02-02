@@ -183,6 +183,9 @@ export function playCheckInSound(status: AttendanceStatus): void {
       case 'late':
         oscillator.frequency.value = 523; // C
         break;
+      case 'absent':
+        oscillator.frequency.value = 220; // Low A (sad tone)
+        break;
       default:
         oscillator.frequency.value = 440; // A
     }
